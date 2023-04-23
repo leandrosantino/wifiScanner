@@ -1,0 +1,276 @@
+    
+// ===================== ESP Controller - Smart Home ============================ //
+
+// Import Modules
+    #include <ESP8266WiFi.h>
+    #include <ESP8266WebServer.h>
+    #include <WiFiClient.h>
+    #include <Arduino_JSON.h>
+    #include <ESP8266HTTPClient.h>
+    #include <WiFiUdp.h> 
+
+// Server Stance
+    ESP8266WebServer server(80);
+    
+// Set Variaveis
+    bool off = LOW;
+    bool on = HIGH;
+
+    uint8_t port1 = D3;
+    uint8_t port2 = D2;
+    uint8_t port3 = D5;
+    uint8_t port4 = D1;
+    bool port1status = off;
+    bool port2status = off;
+    bool port3status = off;
+    bool port4status = off;
+
+// ====================== Formart Hours ====================== //
+
+    inline int getSeconds(uint32_t UNIXTime){
+        return UNIXTime % 60;
+    }
+
+    inline int getMinutes(uint32_t UNIXTime){
+        return UNIXTime / 60 % 60;
+    }
+    
+    inline int getHours(uint32_t UNIXTime){
+        return (UNIXTime / 3600 % 24)-3;
+    }
+
+    bool isHour(int time, int _hour, int _min){
+        int hour = getHours(time);
+        int min = getMinutes(time);
+        int sec = getSeconds(time);
+
+        //Serial.println();
+        //Serial.printf("rUTC time:t%d:%d:%d", hour, min, sec);
+
+        if(hour == _hour && min == _min && sec == 0){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+
+// ======================= HTTP CLIENT ======================= //
+
+    const char* url = "http://worldtimeapi.org/api/timezone/America/Recife";
+    String jsonDate;
+
+    String getRequest(){
+        WiFiClient client;
+        HTTPClient http;
+    
+        http.begin(client, url);
+        
+        int httpCode = http.GET();
+        
+        String payload = "{}";
+        if(httpCode >= 0){
+            payload = http.getString();   
+        }
+
+        http.end();
+        return payload;
+    }
+
+    int DataTime(){
+        jsonDate = getRequest();
+        JSONVar myObject = JSON.parse(jsonDate);
+  
+        if (JSON.typeof(myObject) == "undefined") {
+            Serial.println("Parsing input failed!");
+            return false;
+        }
+
+        int time = myObject["unixtime"];
+        return time;
+    }
+
+// ======================= Routs Functions ====================== //
+
+    void handle_OnConnect() {
+
+        String strStatus1 = "true";
+        String strStatus2 = "true";
+        String strStatus3 = "true";
+        String strStatus4 = "true";
+
+        if(port1status){strStatus1 = "false";}
+        if(port2status){strStatus2 = "false";}
+        if(port3status){strStatus3 = "false";}
+        if(port4status){strStatus4 = "false";}
+        
+        String resp ;
+
+        resp = "{\"response\": \"Connected\", \"portStatus\":  [";
+        resp += strStatus1+ ",";
+        resp += strStatus2+ ",";
+        resp += strStatus3+ ",";
+        resp += strStatus4+ "]}";
+
+        Serial.println();
+        Serial.print("Conneted: ");
+        Serial.println(resp);
+
+        server.send(200, "text/html", resp); 
+    }
+
+    void handle_NotFound() {
+        Serial.println("Not found Rout");
+        server.send(404, "text/plain", "{\"response\": \"Not found\" }");
+    }
+
+    void portOn(int port) {
+        switch (port){
+            case 1:
+                port1status = on;
+                break;
+            case 2:
+                port2status = on;
+                break;
+            case 3:
+                port3status = on;
+                break;
+            case 4:
+                port4status = on;
+                break;
+            default:
+                break;
+        }
+        Serial.print("Port ");
+        Serial.print(port);
+        Serial.print("- ON");
+        server.send(200, "text/html", "{\"response\": \"Ok 200\", \"status\": \"ON\"}");
+    }
+
+    void portOff(int port) {
+        switch (port){
+            case 1:
+                port1status = off;
+                break;
+            case 2:
+                port2status = off;
+                break;
+            case 3:
+                port3status = off;
+                break;
+            case 4:
+                port4status = off;
+                break;
+            default:
+                break;
+        }
+        Serial.println("");
+        Serial.print("Port ");
+        Serial.print(port);
+        Serial.println("- OFF");
+        server.send(200, "text/html", "{\"response\": \"Ok 200\", \"status\": \"OFF\"}");
+    }
+
+
+    void handle_port1ON(){portOn(1);}    
+    void handle_port2ON(){portOn(2);}    
+    void handle_port3ON(){portOn(3);}    
+    void handle_port4ON(){portOn(4);}    
+
+    void handle_port1OFF(){portOff(1);}
+    void handle_port2OFF(){portOff(2);}
+    void handle_port3OFF(){portOff(3);}
+    void handle_port4OFF(){portOff(4);}
+
+
+// ============================== Arduino Functions ============================= //
+
+    void setup() {
+        
+        Serial.begin(9600);
+
+        pinMode(port1, OUTPUT);
+        pinMode(port2, OUTPUT);
+        pinMode(port3, OUTPUT);
+        pinMode(port4, OUTPUT);
+
+        // ================ WiFi Config end Connetion =============== //
+            const char* ssid = "Click.Com";
+            const char* pass = "comum104";
+
+            WiFi.begin(ssid, pass);
+
+            IPAddress staticIP(192, 168, 0, 95);
+            IPAddress gatwey(192, 168, 0, 1); 
+            IPAddress subnet(255, 255, 255, 0);
+            WiFi.config(staticIP, gatwey, subnet, gatwey);
+            
+
+            while(WiFi.status() != WL_CONNECTED){
+                delay(200);
+                Serial.print(".");
+            }
+
+            Serial.print("Connected!! IP_address: ");
+            Serial.println(WiFi.localIP());
+        
+        // ================ Server Set Routs ================ //
+
+            server.on("/", handle_OnConnect);
+
+            server.on("/port1on", handle_port1ON);
+            server.on("/port2on", handle_port2ON);
+            server.on("/port3on", handle_port3ON);
+            server.on("/port4on", handle_port4ON);
+            
+            server.on("/port1off", handle_port1OFF);
+            server.on("/port2off", handle_port2OFF);
+            server.on("/port3off", handle_port3OFF);
+            server.on("/port4off", handle_port4OFF);
+            
+            server.onNotFound(handle_NotFound);
+
+        // ================ Server Initialize ================ //
+
+            server.enableCORS(true);
+            server.begin();
+            Serial.println("HTTP server started");  
+            
+        
+    }
+
+    void loop() {
+
+
+
+        int _time = DataTime();
+
+        if(isHour(_time, 5,30)){
+            port1status = off;
+            port2status = off;
+            Serial.println();
+            Serial.println("Port 1 OFF");
+        }
+        if(isHour(_time, 4,0)){
+            port3status = off;
+            Serial.println();
+            Serial.println("Port 1 OFF");
+        }
+        if(isHour(_time, 15,30)){
+            port3status = on;
+            Serial.println();
+            Serial.println("Port 1 ON");
+        }
+        if(isHour(_time, 15,50)){
+            port4status = on;
+            Serial.println();
+            Serial.println("Port 1 ON");
+        }
+        server.handleClient();
+        digitalWrite(port1, port1status);
+        digitalWrite(port2, port2status);
+        digitalWrite(port3, port3status);
+        digitalWrite(port4, port4status);
+        delay(200);
+    }
+

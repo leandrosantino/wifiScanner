@@ -1,0 +1,45 @@
+#include <ESP8266WiFi.h>
+//#include <ESP8266WebServer.h>
+#include <WiFiUdp.h> 
+
+//ESP8266WebServer server(80);
+
+const char* ssid = "MCUserver";
+const char* pass = "123456";
+
+void handle_OnConnect() {
+  
+  String resp ;
+
+  resp = "Conectado";
+
+  Serial.println();
+  Serial.print("Conneted: ");
+  Serial.println(resp);
+
+  server.send(200, "text/html", resp); 
+}
+
+
+void setup() {
+
+  Serial.begin(115200);
+  
+  Serial.print("Setting AP (Access Point)…");
+  // Remove the password parameter, if you want the AP (Access Point) to be open
+  WiFi.softAP(ssid, pass);
+
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("AP IP address: ");
+  Serial.println(IP);
+
+  // Print ESP8266 Local IP Address
+  Serial.println(WiFi.localIP());
+
+  //server.on("/", handle_OnConnect);
+  //server.begin();
+}
+
+void loop() {
+
+}
